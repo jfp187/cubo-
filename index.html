@@ -28,7 +28,7 @@ async function activateXR() {
 
   // 3. Solicitar formalmente la sesión de Realidad Aumentada
   xrSession = await navigator.xr.requestSession("immersive-ar", {
-    requiredFeatures: ['local'] // 'local' o 'local-floor' para tracking básico
+    requiredFeatures: ['local'] 
   });
 
   // Ocultar el botón una vez iniciada la sesión
@@ -45,7 +45,7 @@ async function activateXR() {
   // 6. Inicializar componentes mínimos de Three.js
   scene = new THREE.Scene();
 
-  // Creamos un cubo rápido para tener algo que ver en la pantalla
+  // Creamos un cubo rápido de 20cm para tener algo que ver en la pantalla
   const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
   const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
   const cube = new THREE.Mesh(geometry, material);
@@ -64,22 +64,22 @@ async function activateXR() {
   });
   renderer.autoClear = false;
 
-  // 7. INICIAR EL BUCLE aquí dentro, ya que ahora 'xrSession' sí existe
+  // 7. INICIAR EL BUCLE (Solo ocurre tras la interacción del usuario)
   xrSession.requestAnimationFrame(onXRFrame);
 }
 
-// 8. El render loop (Bucle de animación)
+// 8. El render loop (Bucle de animación único)
 const onXRFrame = (time, frame) => {
-  // Volver a solicitar el siguiente cuadro (usa la variable global xrSession)
+  // Volver a solicitar el siguiente cuadro de animación
   xrSession.requestAnimationFrame(onXRFrame);
 
-  // Vincular el framebuffer
+  // Vincular el framebuffer de gráficos a WebXR
   gl.bindFramebuffer(gl.FRAMEBUFFER, xrSession.renderState.baseLayer.framebuffer);
 
-  // Obtener la posición del dispositivo
+  // Obtener la posición y orientación del dispositivo en el espacio real
   const pose = frame.getViewerPose(referenceSpace);
   if (pose) {
-    // En web AR móvil casi siempre hay una sola vista (pantalla del celular)
+    // En web AR móvil casi siempre hay una sola vista (la pantalla del celular)
     const view = pose.views[0];
     const viewport = xrSession.renderState.baseLayer.getViewport(view);
     
@@ -90,38 +90,10 @@ const onXRFrame = (time, frame) => {
     camera.projectionMatrix.fromArray(view.projectionMatrix);
     camera.updateMatrixWorld(true);
 
-    // Renderizar la escena
+    // Renderizar la escena final
     renderer.render(scene, camera);
   }
 };
-  // Create a render loop that allows us to draw on the AR view.
-const onXRFrame = (time, frame) => {
-  // Queue up the next draw request.
-  session.requestAnimationFrame(onXRFrame);
-
-  // Bind the graphics framebuffer to the baseLayer's framebuffer
-  gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer)
-
-  // Retrieve the pose of the device.
-  // XRFrame.getViewerPose can return null while the session attempts to establish tracking.
-  const pose = frame.getViewerPose(referenceSpace);
-  if (pose) {
-    // In mobile AR, we only have one view.
-    const view = pose.views[0];
-
-    const viewport = session.renderState.baseLayer.getViewport(view);
-    renderer.setSize(viewport.width, viewport.height)
-
-    // Use the view's transform matrix and projection matrix to configure the THREE.camera.
-    camera.matrix.fromArray(view.transform.matrix)
-    camera.projectionMatrix.fromArray(view.projectionMatrix);
-    camera.updateMatrixWorld(true);
-
-    // Render the scene with THREE.WebGLRenderer.
-    renderer.render(scene, camera)
-  }
-}
-session.requestAnimationFrame(onXRFrame);
 </script>
 </body>
 </html>
