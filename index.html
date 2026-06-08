@@ -3,16 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-  <title>Hello WebXR!</title>
+  <title>Hello WebXR con Modelos 3D!</title>
 
   <script src="https://unpkg.com/three@0.126.0/build/three.js"></script>
+  <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
 
 <button onclick="activateXR()">Start Hello WebXR</button>
 
 <script>
-// 1. Declarar variables globales para que estén accesibles en todo el script
+// Variables globales
 let xrSession = null;
 let gl = null;
 let renderer = null;
@@ -20,41 +21,54 @@ let scene = null;
 let camera = null;
 let referenceSpace = null;
 
+// Variables para nuestros modelos 3D
+let reticle = null;
+let flower = null;
+
 async function activateXR() {
-  // 2. Añadir el canvas e inicializar WebGL con compatibilidad XR
   const canvas = document.createElement("canvas");
   document.body.appendChild(canvas);
   gl = canvas.getContext("webgl", { xrCompatible: true });
 
-  // 3. Solicitar formalmente la sesión de Realidad Aumentada
   xrSession = await navigator.xr.requestSession("immersive-ar", {
     requiredFeatures: ['local'] 
   });
 
-  // Ocultar el botón una vez iniciada la sesión
   document.querySelector('button').style.display = 'none';
 
-  // 4. Configurar el "Layer" (capa donde WebXR dibujará)
   xrSession.updateRenderState({
     baseLayer: new XRWebGLLayer(xrSession, gl)
   });
 
-  // 5. Obtener el espacio de referencia (coordenadas del mundo real)
   referenceSpace = await xrSession.requestReferenceSpace('local');
 
-  // 6. Inicializar componentes mínimos de Three.js
+  // Inicializar la Escena de Three.js
   scene = new THREE.Scene();
 
-  // Creamos un cubo rápido de 20cm para tener algo que ver en la pantalla
-  const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-  const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-  const cube = new THREE.Mesh(geometry, material);
-  cube.position.set(0, 0, -1); // 1 metro frente a la cámara
-  scene.add(cube);
+  // WebXR requiere luces para que los modelos GLTF con texturas no se vean completamente negros
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+  scene.add(ambientLight);
 
-  // Configuramos la cámara y el renderer vinculándolos al contexto de WebGL
+  // Instanciar el cargador de GLTF AHORA que la escena ya existe
+  const loader = new THREE.GLTFLoader();
+
+  // Cargar la Retícula
+  loader.load("https://immersive-web.github.io/webxr-samples/media/gltf/reticle/reticle.gltf", function(gltf) {
+    reticle = gltf.scene;
+    reticle.position.set(0, 0, -1); // Posición inicial visible temporalmente 
+    scene.add(reticle);
+  });
+
+  // Cargar el Girasol
+  loader.load("https://immersive-web.github.io/webxr-samples/media/gltf/sunflower/sunflower.gltf", function(gltf) {
+    flower = gltf.scene;
+    flower.position.set(0, -0.5, -1.5); // Lo posicionamos un poco al fondo
+    scene.add(flower);
+  });
+
+  // Configurar Cámara y Renderer
   camera = new THREE.PerspectiveCamera();
-  camera.matrixAutoUpdate = false; // WebXR controlará la matriz de la cámara
+  camera.matrixAutoUpdate = false; 
 
   renderer = new THREE.WebGLRenderer({
     alpha: true,
@@ -64,47 +78,32 @@ async function activateXR() {
   });
   renderer.autoClear = false;
 
-  // 7. INICIAR EL BUCLE (Solo ocurre tras la interacción del usuario)
+  // Iniciar el ciclo de renderizado
   xrSession.requestAnimationFrame(onXRFrame);
 }
-const loader = new THREE.GLTFLoader();
-let reticle;
-loader.load("https://immersive-web.github.io/webxr-samples/media/gltf/reticle/reticle.gltf", function(gltf) {
-  reticle = gltf.scene;
-  reticle.visible = false;
-  scene.add(reticle);
-})
 
-let flower;
-loader.load("https://immersive-web.github.io/webxr-samples/media/gltf/sunflower/sunflower.gltf", function(gltf) {
-  flower = gltf.scene;
-});
-
-// Create a render loop that allows us to draw on the AR view.
+// El ciclo de animación (Unificado y sin duplicados)
 const onXRFrame = (time, frame) => {
-// 8. El render loop (Bucle de animación único)
-const onXRFrame = (time, frame) => {
-  // Volver a solicitar el siguiente cuadro de animación
   xrSession.requestAnimationFrame(onXRFrame);
 
-  // Vincular el framebuffer de gráficos a WebXR
   gl.bindFramebuffer(gl.FRAMEBUFFER, xrSession.renderState.baseLayer.framebuffer);
 
-  // Obtener la posición y orientación del dispositivo en el espacio real
   const pose = frame.getViewerPose(referenceSpace);
   if (pose) {
-    // En web AR móvil casi siempre hay una sola vista (la pantalla del celular)
     const view = pose.views[0];
     const viewport = xrSession.renderState.baseLayer.getViewport(view);
     
     renderer.setSize(viewport.width, viewport.height);
 
-    // Sincronizar las matrices de la cámara de Three.js con el dispositivo real
     camera.matrix.fromArray(view.transform.matrix);
     camera.projectionMatrix.fromArray(view.projectionMatrix);
     camera.updateMatrixWorld(true);
 
-    // Renderizar la escena final
+    // Animación opcional: Hacer que el girasol rote un poco si ya terminó de cargar
+    if (flower) {
+      flower.rotation.y += 0.01;
+    }
+
     renderer.render(scene, camera);
   }
 };
